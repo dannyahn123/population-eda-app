@@ -263,7 +263,8 @@ class EDA:
             return
 
         try:
-            df = pd.read_csv(uploaded_file)
+            # CSV 파일을 읽을 때 모든 데이터를 문자열로 불러오도록 dtype=str 옵션 추가
+            df = pd.read_csv(uploaded_file, dtype=str)
         except Exception as e:
             st.error(f"파일을 읽는 중 오류가 발생했습니다: {e}")
             return
@@ -288,6 +289,7 @@ class EDA:
         # 최종적으로 모든 숫자 컬럼을 정수형(int)으로 변환합니다.
         for col in numeric_cols:
              df[col] = df[col].astype(int)
+        df['연도'] = df['연도'].astype(int)
 
         st.success("데이터가 성공적으로 로드 및 전처리되었습니다.")
 
@@ -351,58 +353,60 @@ class EDA:
             
             df_local = df[df['지역'] != '전국']
             
-            latest_year = df_local['연도'].max()
-            start_year = latest_year - 5
-            
-            df_recent = df_local[df_local['연도'] == latest_year]
-            df_past = df_local[df_local['연도'] == start_year]
+            if not df_local.empty:
+                latest_year = df_local['연도'].max()
+                start_year = latest_year - 5
+                
+                df_recent = df_local[df_local['연도'] == latest_year]
+                df_past = df_local[df_local['연도'] == start_year]
 
-            merged_df = pd.merge(df_recent, df_past, on='지역', suffixes=('_latest', '_past'))
-            merged_df['pop_change'] = merged_df['인구_latest'] - merged_df['인구_past']
-            merged_df['change_rate'] = (merged_df['pop_change'] / merged_df['인구_past']) * 100
-            
-            # 영문 지역명 매핑
-            region_map = {
-                '서울': 'Seoul', '부산': 'Busan', '대구': 'Daegu', '인천': 'Incheon',
-                '광주': 'Gwangju', '대전': 'Daejeon', '울산': 'Ulsan', '세종': 'Sejong',
-                '경기': 'Gyeonggi', '강원': 'Gangwon', '충북': 'Chungbuk', '충남': 'Chungnam',
-                '전북': 'Jeonbuk', '전남': 'Jeonnam', '경북': 'Gyeongbuk', '경남': 'Gyeongnam',
-                '제주': 'Jeju'
-            }
-            merged_df['Region_Eng'] = merged_df['지역'].map(region_map)
+                # 비교할 과거 데이터가 있는 경우에만 병합 및 분석 수행
+                if not df_past.empty:
+                    merged_df = pd.merge(df_recent, df_past, on='지역', suffixes=('_latest', '_past'))
+                    merged_df['pop_change'] = merged_df['인구_latest'] - merged_df['인구_past']
+                    merged_df['change_rate'] = (merged_df['pop_change'] / merged_df['인구_past']) * 100
+                    
+                    # 영문 지역명 매핑
+                    region_map = {
+                        '서울': 'Seoul', '부산': 'Busan', '대구': 'Daegu', '인천': 'Incheon',
+                        '광주': 'Gwangju', '대전': 'Daejeon', '울산': 'Ulsan', '세종': 'Sejong',
+                        '경기': 'Gyeonggi', '강원': 'Gangwon', '충북': 'Chungbuk', '충남': 'Chungnam',
+                        '전북': 'Jeonbuk', '전남': 'Jeonnam', '경북': 'Gyeongbuk', '경남': 'Gyeongnam',
+                        '제주': 'Jeju'
+                    }
+                    merged_df['Region_Eng'] = merged_df['지역'].map(region_map)
 
-            # 변화량 기준 정렬
-            sorted_by_change = merged_df.sort_values('pop_change', ascending=False)
-            
-            # 변화량 시각화 (수평 막대 그래프)
-            fig2, ax2 = plt.subplots(figsize=(12, 8))
-            bars = sns.barplot(x='pop_change', y='Region_Eng', data=sorted_by_change, ax=ax2)
-            ax2.set_title(f'Population Change by Region ({start_year} vs {latest_year})')
-            ax2.set_xlabel('Population Change (in thousands)')
-            ax2.set_ylabel('Region')
-            ax2.bar_label(bars, fmt=lambda x: f'{x/1000:,.0f}k')
-            st.pyplot(fig2)
+                    # 변화량 기준 정렬
+                    sorted_by_change = merged_df.sort_values('pop_change', ascending=False)
+                    
+                    # 변화량 시각화 (수평 막대 그래프)
+                    fig2, ax2 = plt.subplots(figsize=(12, 8))
+                    bars = sns.barplot(x='pop_change', y='Region_Eng', data=sorted_by_change, ax=ax2)
+                    ax2.set_title(f'Population Change by Region ({start_year} vs {latest_year})')
+                    ax2.set_xlabel('Population Change (in thousands)')
+                    ax2.set_ylabel('Region')
+                    ax2.bar_label(bars, fmt=lambda x: f'{x/1000:,.0f}k')
+                    st.pyplot(fig2)
 
-            st.markdown("""
-            > **그래프 해석:** 경기, 인천, 세종 등 수도권 및 신도시 지역에서 인구가 크게 증가한 반면, 서울, 부산, 대구 등 기존 대도시에서는 인구가 감소하는 경향을 보입니다. 이는 산업 구조 변화와 수도권 집중 현상을 반영합니다.
-            """)
+                    st.markdown("> **그래프 해석:** 경기, 인천, 세종 등 수도권 및 신도시 지역에서 인구가 크게 증가한 반면, 서울, 부산, 대구 등 기존 대도시에서는 인구가 감소하는 경향을 보입니다. 이는 산업 구조 변화와 수도권 집중 현상을 반영합니다.")
 
-            # 변화율 기준 정렬
-            sorted_by_rate = merged_df.sort_values('change_rate', ascending=False)
-            
-            # 변화율 시각화 (수평 막대 그래프)
-            fig3, ax3 = plt.subplots(figsize=(12, 8))
-            bars_rate = sns.barplot(x='change_rate', y='Region_Eng', data=sorted_by_rate, ax=ax3)
-            ax3.set_title(f'Population Change Rate by Region ({start_year} vs {latest_year})')
-            ax3.set_xlabel('Change Rate (%)')
-            ax3.set_ylabel('Region')
-            ax3.bar_label(bars_rate, fmt='%.2f%%')
-            st.pyplot(fig3)
-            
-            st.markdown("""
-            > **그래프 해석:** 변화율 측면에서는 세종시의 인구 증가가 압도적으로 높게 나타납니다. 이는 행정수도 이전의 효과로 분석됩니다. 반면, 울산, 부산 등 전통적인 산업 도시의 인구 감소율이 상대적으로 높게 나타납니다.
-            """)
-
+                    # 변화율 기준 정렬
+                    sorted_by_rate = merged_df.sort_values('change_rate', ascending=False)
+                    
+                    # 변화율 시각화 (수평 막대 그래프)
+                    fig3, ax3 = plt.subplots(figsize=(12, 8))
+                    bars_rate = sns.barplot(x='change_rate', y='Region_Eng', data=sorted_by_rate, ax=ax3)
+                    ax3.set_title(f'Population Change Rate by Region ({start_year} vs {latest_year})')
+                    ax3.set_xlabel('Change Rate (%)')
+                    ax3.set_ylabel('Region')
+                    ax3.bar_label(bars_rate, fmt='%.2f%%')
+                    st.pyplot(fig3)
+                    
+                    st.markdown("> **그래프 해석:** 변화율 측면에서는 세종시의 인구 증가가 압도적으로 높게 나타납니다. 이는 행정수도 이전의 효과로 분석됩니다. 반면, 울산, 부산 등 전통적인 산업 도시의 인구 감소율이 상대적으로 높게 나타납니다.")
+                else:
+                    st.warning(f"{start_year}년 데이터가 없어 최근 5년간의 변화를 분석할 수 없습니다.")
+            else:
+                st.warning("분석할 지역 데이터가 없습니다.")
 
         with tab4:
             st.subheader("연도별 인구 증감 상위 100")
@@ -460,10 +464,17 @@ Page_EDA      = st.Page(EDA,      title="EDA",     icon="📊", url_path="eda")
 # ---------------------
 # 네비게이션 실행
 # ---------------------
+# 로그인 상태에 관계 없이 항상 모든 페이지를 표시합니다.
+# 단, 로그인이 필요한 페이지(UserInfo, Logout)는 로그인 시에만 접근 가능하도록 각 클래스 내부에서 처리할 수 있습니다.
+# 현재 구조에서는 네비게이션 목록 자체를 동적으로 변경합니다.
+base_pages = [Page_Home, Page_EDA, Page_Login, Page_Register, Page_FindPW]
 if st.session_state.logged_in:
+    # 로그아웃, 내정보 페이지 추가
     pages = [Page_Home, Page_User, Page_Logout, Page_EDA]
 else:
-    pages = [Page_Home, Page_Login, Page_Register, Page_FindPW]
+    # 로그인, 회원가입, 비번찾기 페이지
+    pages = [Page_Home, Page_Login, Page_Register, Page_FindPW, Page_EDA]
+
 
 pg = st.navigation(pages)
 pg.run()
