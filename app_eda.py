@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import platform
+import json
 
 # ---------------------
 # 한글 폰트 설정 (Windows, Mac)
@@ -67,30 +68,22 @@ class Home:
         st.markdown("---")
         st.header("과제 소개")
         st.markdown("""
-        이 웹 애플리케이션은 두 가지 주요 데이터 분석 기능을 제공합니다.
-        - **자전거 수요 예측 분석**: Kaggle의 Bike Sharing Demand 데이터를 활용하여 시간대별 자전거 대여량을 분석하고 예측합니다.
-        - **지역별 인구 추이 분석**: `population_trends.csv` 데이터를 기반으로 국내 지역별 인구 변화를 탐색하고 시각화합니다.
+        이 웹 애플리케이션은 `population_trends.csv` 데이터를 기반으로
+        국내 지역별 인구 변화를 탐색하고 시각화하는 기능을 제공합니다.
 
-        좌측 메뉴의 **EDA** 페이지에서 원하는 분석을 선택하여 진행할 수 있습니다.
+        좌측 메뉴의 **EDA** 페이지에서 데이터 분석을 수행할 수 있습니다.
         """)
         
         st.markdown("---")
-        # 데이터셋 출처 소개
-        st.subheader("B.D.D (Bike Sharing Demand) 데이터셋")
-        st.markdown("""  
-        - **제공처**: [Kaggle Bike Sharing Demand Competition](https://www.kaggle.com/c/bike-sharing-demand)  
-        - **설명**: 2011–2012년 워싱턴 D.C.의 시간별 자전거 대여량 데이터.
-        """)
-
         st.subheader("지역별 인구 추이 데이터셋")
         st.markdown("""
         - **파일명**: `population_trends.csv`
-        - **설명**: 특정 기간 동안의 국내 지역별 인구, 출생아 수, 사망자 수 등의 정보를 담고 있는 데이터.
+        - **설명**: 특정 기간 동안의 국내 지역별 인구, 출생아 수, 사망자 수 등의 정보를 담고 있는 데이터입니다.
         """)
 
 
 # ---------------------
-# 로그인 페이지 클래스
+# 로그인 페이지 클래스 (오류 메시지 개선)
 # ---------------------
 class Login:
     def __init__(self):
@@ -115,10 +108,19 @@ class Login:
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
-                st.error(f"로그인 실패: {e}")
+                try:
+                    error_json = e.args[1]
+                    error_message = json.loads(error_json)['error']['message']
+
+                    if error_message == "INVALID_LOGIN_CREDENTIALS":
+                        st.error("로그인 실패: 이메일 또는 비밀번호가 올바르지 않습니다.")
+                    else:
+                        st.error(f"로그인 실패: {error_message}")
+                except (IndexError, KeyError, json.JSONDecodeError):
+                    st.error(f"로그인 실패: 알 수 없는 오류가 발생했습니다. ({e})")
 
 # ---------------------
-# 회원가입 페이지 클래스 (오류 메시지 표시 기능 추가)
+# 회원가입 페이지 클래스 (오류 메시지 개선)
 # ---------------------
 class Register:
     def __init__(self, login_page_url):
@@ -148,8 +150,23 @@ class Register:
                 time.sleep(1)
                 st.switch_page(login_page_url)
             except Exception as e:
-                # 실패 시 구체적인 오류 메시지를 화면에 출력
-                st.error(f"회원가입 실패: {e}")
+                try:
+                    error_json = e.args[1] 
+                    error_data = json.loads(error_json)
+                    error_message = error_data['error']['message']
+
+                    if error_message == "EMAIL_EXISTS":
+                        st.error("회원가입 실패: 이미 가입된 이메일 주소입니다.")
+                    elif "WEAK_PASSWORD" in error_message:
+                        st.error("회원가입 실패: 보안 강도가 약합니다. 비밀번호는 6자 이상이어야 합니다.")
+                    elif "Permission denied" in str(e):
+                        st.error("회원가입 실패: 데이터베이스 쓰기 권한이 없습니다. Firebase 설정을 확인하세요.")
+                    else:
+                        st.error(f"회원가입 실패: {error_message}")
+
+                except (IndexError, KeyError, json.JSONDecodeError):
+                    st.error(f"회원가입 실패: 알 수 없는 오류가 발생했습니다. ({e})")
+
 
 # ---------------------
 # 비밀번호 찾기 페이지 클래스
@@ -229,25 +246,16 @@ class Logout:
         st.rerun()
 
 # ---------------------
-# EDA 페이지 클래스 (수정됨)
+# EDA 페이지 클래스
 # ---------------------
 class EDA:
     def __init__(self):
-        st.title("📊 Exploratory Data Analysis")
-        
-        analysis_type = st.sidebar.selectbox(
-            "분석 유형 선택",
-            ("자전거 수요 예측 분석", "지역별 인구 추이 분석")
-        )
-
-        if analysis_type == "자전거 수요 예측 분석":
-            self.bike_sharing_eda()
-        else:
-            self.population_trends_eda()
+        self.population_trends_eda()
 
     def population_trends_eda(self):
         """지역별 인구 추이 분석 EDA 수행"""
-        st.header("📈 지역별 인구 추이 분석")
+        st.title("📊 지역별 인구 추이 분석")
+        
         uploaded_file = st.file_uploader("인구 데이터 업로드 (population_trends.csv)", type="csv")
         
         if uploaded_file is None:
@@ -408,6 +416,13 @@ class EDA:
             pivot_df.fillna(0, inplace=True)
             
             # 영문으로 컬럼명 변경
+            region_map = {
+                '서울': 'Seoul', '부산': 'Busan', '대구': 'Daegu', '인천': 'Incheon',
+                '광주': 'Gwangju', '대전': 'Daejeon', '울산': 'Ulsan', '세종': 'Sejong',
+                '경기': 'Gyeonggi', '강원': 'Gangwon', '충북': 'Chungbuk', '충남': 'Chungnam',
+                '전북': 'Jeonbuk', '전남': 'Jeonnam', '경북': 'Gyeongbuk', '경남': 'Gyeongnam',
+                '제주': 'Jeju'
+            }
             pivot_df.columns = pivot_df.columns.map(region_map)
             
             fig4, ax4 = plt.subplots(figsize=(15, 10))
@@ -419,83 +434,6 @@ class EDA:
             ax4.legend(title='Region', bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.tight_layout()
             st.pyplot(fig4)
-
-
-    def bike_sharing_eda(self):
-        """기존의 자전거 수요 예측 EDA 수행"""
-        st.header("🚲 Bike Sharing Demand EDA")
-        uploaded = st.file_uploader("데이터셋 업로드 (train.csv)", type="csv")
-        if not uploaded:
-            st.info("train.csv 파일을 업로드 해주세요.")
-            return
-
-        df = pd.read_csv(uploaded, parse_dates=['datetime'])
-
-        tabs = st.tabs([
-            "1. 목적 & 절차", "2. 데이터셋 설명", "3. 데이터 로드 & 품질 체크", "4. Datetime 특성 추출",
-            "5. 시각화", "6. 상관관계 분석", "7. 이상치 제거", "8. 로그 변환"
-        ])
-
-        with tabs[0]:
-            st.header("🔭 목적 & 분석 절차")
-            st.markdown("""
-            **목적**: Bike Sharing Demand 데이터셋을 탐색하고,
-            다양한 특성이 대여량(count)에 미치는 영향을 파악합니다.
-            """)
-        
-        with tabs[1]:
-            st.header("🔍 데이터셋 설명")
-            st.markdown(f"총 관측치: {df.shape[0]}개")
-            st.subheader("1) 데이터 구조 (`df.info()`)")
-            buffer = io.StringIO()
-            df.info(buf=buffer)
-            st.text(buffer.getvalue())
-
-        with tabs[2]:
-            st.header("📥 데이터 로드 & 품질 체크")
-            st.subheader("결측값 개수")
-            missing = df.isnull().sum()
-            st.bar_chart(missing)
-
-        with tabs[3]:
-            st.header("🕒 Datetime 특성 추출")
-            df['year'] = df['datetime'].dt.year
-            df['month'] = df['datetime'].dt.month
-            df['hour'] = df['datetime'].dt.hour
-            df['dayofweek'] = df['datetime'].dt.dayofweek
-            st.dataframe(df[['datetime', 'year', 'month', 'hour', 'dayofweek']].head())
-
-        with tabs[4]:
-            st.header("📈 시각화")
-            st.subheader("근무일 여부별 시간대별 평균 대여량")
-            fig1, ax1 = plt.subplots()
-            sns.pointplot(x='hour', y='count', hue='workingday', data=df, ax=ax1)
-            st.pyplot(fig1)
-
-        with tabs[5]:
-            st.header("🔗 상관관계 분석")
-            features = ['temp', 'atemp', 'humidity', 'windspeed', 'count']
-            corr_df = df[features].corr()
-            fig, ax = plt.subplots()
-            sns.heatmap(corr_df, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
-            st.pyplot(fig)
-            
-        with tabs[6]:
-            st.header("🚫 이상치 제거")
-            mean_count = df['count'].mean()
-            std_count = df['count'].std()
-            upper = mean_count + 3 * std_count
-            df_no = df[df['count'] <= upper]
-            st.write(f"이상치 제거 전: {df.shape[0]}개, 제거 후: {df_no.shape[0]}개")
-
-        with tabs[7]:
-            st.header("🔄 로그 변환")
-            df['log_count'] = np.log1p(df['count'])
-            fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 4))
-            sns.histplot(df['count'], kde=True, ax=axes[0])
-            sns.histplot(df['log_count'], kde=True, ax=axes[1])
-            st.pyplot(fig)
-
 
 # ---------------------
 # 페이지 객체 생성
