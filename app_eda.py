@@ -56,7 +56,7 @@ if "logged_in" not in st.session_state:
     st.session_state.profile_image_url = ""
 
 # ---------------------
-# 홈 페이지 클래스 (수정됨)
+# 홈 페이지 클래스
 # ---------------------
 class Home:
     def __init__(self, login_page, register_page, findpw_page):
@@ -114,11 +114,11 @@ class Login:
                 st.success("로그인 성공!")
                 time.sleep(1)
                 st.rerun()
-            except Exception:
-                st.error("로그인 실패")
+            except Exception as e:
+                st.error(f"로그인 실패: {e}")
 
 # ---------------------
-# 회원가입 페이지 클래스
+# 회원가입 페이지 클래스 (오류 메시지 표시 기능 추가)
 # ---------------------
 class Register:
     def __init__(self, login_page_url):
@@ -131,7 +131,10 @@ class Register:
 
         if st.button("회원가입"):
             try:
+                # 1. Firebase Authentication에 사용자 생성
                 auth.create_user_with_email_and_password(email, password)
+                
+                # 2. Firebase Realtime Database에 사용자 정보 저장
                 firestore.child("users").child(email.replace(".", "_")).set({
                     "email": email,
                     "name": name,
@@ -140,11 +143,13 @@ class Register:
                     "role": "user",
                     "profile_image_url": ""
                 })
+                
                 st.success("회원가입 성공! 로그인 페이지로 이동합니다.")
                 time.sleep(1)
                 st.switch_page(login_page_url)
-            except Exception:
-                st.error("회원가입 실패")
+            except Exception as e:
+                # 실패 시 구체적인 오류 메시지를 화면에 출력
+                st.error(f"회원가입 실패: {e}")
 
 # ---------------------
 # 비밀번호 찾기 페이지 클래스
@@ -159,8 +164,8 @@ class FindPassword:
                 st.success("비밀번호 재설정 이메일을 전송했습니다.")
                 time.sleep(1)
                 st.rerun()
-            except:
-                st.error("이메일 전송 실패")
+            except Exception as e:
+                st.error(f"이메일 전송 실패: {e}")
 
 # ---------------------
 # 사용자 정보 수정 페이지 클래스
