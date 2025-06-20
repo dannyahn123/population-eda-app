@@ -384,11 +384,12 @@ class EDA:
                         
                         # 변화량 시각화 (수평 막대 그래프)
                         fig2, ax2 = plt.subplots(figsize=(12, 8))
-                        bars = sns.barplot(x='pop_change', y='Region_Eng', data=sorted_by_change, ax=ax2)
+                        sns.barplot(x='pop_change', y='Region_Eng', data=sorted_by_change, ax=ax2)
                         ax2.set_title(f'Population Change by Region ({start_year} vs {latest_year})')
                         ax2.set_xlabel('Population Change (in thousands)')
                         ax2.set_ylabel('Region')
-                        ax2.bar_label(bars, fmt=lambda x: f'{x/1000:,.0f}k')
+                        if ax2.containers:
+                            ax2.bar_label(ax2.containers[0], fmt=lambda x: f'{x/1000:,.0f}k')
                         st.pyplot(fig2)
 
                         st.markdown("> **그래프 해석:** 경기, 인천, 세종 등 수도권 및 신도시 지역에서 인구가 크게 증가한 반면, 서울, 부산, 대구 등 기존 대도시에서는 인구가 감소하는 경향을 보입니다. 이는 산업 구조 변화와 수도권 집중 현상을 반영합니다.")
@@ -398,11 +399,12 @@ class EDA:
                         
                         # 변화율 시각화 (수평 막대 그래프)
                         fig3, ax3 = plt.subplots(figsize=(12, 8))
-                        bars_rate = sns.barplot(x='change_rate', y='Region_Eng', data=sorted_by_rate, ax=ax3)
+                        sns.barplot(x='change_rate', y='Region_Eng', data=sorted_by_rate, ax=ax3)
                         ax3.set_title(f'Population Change Rate by Region ({start_year} vs {latest_year})')
                         ax3.set_xlabel('Change Rate (%)')
                         ax3.set_ylabel('Region')
-                        ax3.bar_label(bars_rate, fmt='%.2f%%')
+                        if ax3.containers:
+                            ax3.bar_label(ax3.containers[0], fmt='%.2f%%')
                         st.pyplot(fig3)
                         
                         st.markdown("> **그래프 해석:** 변화율 측면에서는 세종시의 인구 증가가 압도적으로 높게 나타납니다. 이는 행정수도 이전의 효과로 분석됩니다. 반면, 울산, 부산 등 전통적인 산업 도시의 인구 감소율이 상대적으로 높게 나타납니다.")
