@@ -270,11 +270,22 @@ class EDA:
             
         # 데이터 전처리
         numeric_cols = ['인구', '출생아수(명)', '사망자수(명)']
-        df.loc[df['지역'] == '세종', numeric_cols] = df.loc[df['지역'] == '세종', numeric_cols].replace('-', '0')
-        for col in numeric_cols:
-            df[col] = pd.to_numeric(df[col].str.replace(',', ''), errors='coerce')
         
+        # '세종' 지역의 '-'를 '0'으로 대체합니다.
+        df.loc[df['지역'] == '세종', numeric_cols] = df.loc[df['지역'] == '세종', numeric_cols].replace('-', '0')
+
+        for col in numeric_cols:
+            # 컬럼이 문자열(object) 타입인 경우에만 쉼표(,) 제거를 시도합니다.
+            if pd.api.types.is_string_dtype(df[col]):
+                df[col] = df[col].str.replace(',', '')
+            
+            # 숫자형으로 변환합니다. 변환할 수 없는 값은 NaN(Not a Number)으로 처리됩니다.
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        # 변환 과정에서 생긴 NaN 값을 0으로 채웁니다.
         df.fillna(0, inplace=True)
+
+        # 최종적으로 모든 숫자 컬럼을 정수형(int)으로 변환합니다.
         for col in numeric_cols:
              df[col] = df[col].astype(int)
 
@@ -438,7 +449,7 @@ class EDA:
 # ---------------------
 # 페이지 객체 생성
 # ---------------------
-Page_Login    = st.Page(Login,    title="Login",    icon="🔐", url_path="login")
+Page_Login    = st.Page(Login,    title="Login",    icon="�", url_path="login")
 Page_Register = st.Page(lambda: Register(Page_Login.url_path), title="Register", icon="📝", url_path="register")
 Page_FindPW   = st.Page(FindPassword, title="Find PW", icon="🔎", url_path="find-password")
 Page_Home     = st.Page(lambda: Home(Page_Login, Page_Register, Page_FindPW), title="Home", icon="🏠", url_path="home", default=True)
